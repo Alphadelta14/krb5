@@ -20,10 +20,48 @@
 MAKE_INIT_FUNCTION(krb5int_lib_init);
 MAKE_FINI_FUNCTION(krb5int_lib_fini);
 
+#ifdef HAVE_DLFCN_H
+#include <dlfcn.h>
+#include <libgen.h>
+
+static krb5_error_code get_locale_dir(char **ret_path)
+{
+    char *libdir, *fname;
+    Dl_info dl_info = {};
+    long ret;
+
+    // Use the directory name of the object file containing
+    // krb5int_lib_init (lib/libkrb5.so, etc.)
+    dladdr((void*)krb5int_lib_init, &dl_info);
+
+    fname = strdup(dl_info.dli_fname);
+    if (fname == NULL)
+        return ENOMEM;
+    // don't free libdir, only free fname after join
+    libdir = dirname(fname);
+    ret = k5_path_join(dirname(libdir), "share/locale", ret_path);
+    free(fname);
+
+    return ret;
+}
+
+#else /* ! HAVE_DLFCN_H */
+
+static krb5_error_code get_locale_dir(char **ret_path)
+{
+    *ret_path = strdup(LOCALEDIR);
+    if (*ret_path == NULL)
+        return ENOMEM;
+    return 0;
+}
+
+#endif
+
 /* Possibly load-time initialization -- mutexes, etc.  */
 int krb5int_lib_init(void)
 {
     int err;
+    char *locale_dir;
 
     k5_set_error_info_callout_fn(error_message);
 
@@ -38,7 +76,14 @@ int krb5int_lib_init(void)
     add_error_table(&et_asn1_error_table);
     add_error_table(&et_k524_error_table);
 
-    bindtextdomain(KRB5_TEXTDOMAIN, LOCALEDIR);
+    err = get_locale_dir(&locale_dir);
+    if (err)
+        return err;
+    if (bindtextdomain(KRB5_TEXTDOMAIN, locale_dir) == NULL) {
+        free(locale_dir);
+        return ENOMEM;
+    }
+    free(locale_dir);
 
     err = krb5int_rc_finish_init();
     if (err)
