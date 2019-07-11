@@ -37,7 +37,7 @@ static const char *objdirs[] = {
 #if TARGET_OS_MAC
     KRB5_AUTHDATA_PLUGIN_BUNDLE_DIR,
 #endif
-    LIBDIR "/krb5/plugins/authdata",
+    "lib/krb5/plugins/authdata",
     NULL
 }; /* should be a list */
 

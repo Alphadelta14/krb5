@@ -344,10 +344,10 @@ cleanup:
 
 #if TARGET_OS_MAC
 static const char *objdirs[] = { KRB5_PLUGIN_BUNDLE_DIR,
-                                 LIBDIR "/krb5/plugins/libkrb5",
+                                 "lib/krb5/plugins/libkrb5",
                                  NULL }; /* should be a list */
 #else
-static const char *objdirs[] = { LIBDIR "/krb5/plugins/libkrb5", NULL };
+static const char *objdirs[] = { "lib/krb5/plugins/libkrb5", NULL };
 #endif
 
 struct module_callback_data {
