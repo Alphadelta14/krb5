@@ -82,9 +82,9 @@
 #define KDC_PROFILE_ENV         "KRB5_KDC_PROFILE"
 
 #if TARGET_OS_MAC
-#define DEFAULT_KDB_LIB_PATH    { KDB5_PLUGIN_BUNDLE_DIR, "@MODULEDIR/kdb", NULL }
+#define DEFAULT_KDB_LIB_PATH    { KDB5_PLUGIN_BUNDLE_DIR, "lib/krb5/plugins/kdb", NULL }
 #else
-#define DEFAULT_KDB_LIB_PATH    { "@MODULEDIR/kdb", NULL }
+#define DEFAULT_KDB_LIB_PATH    { "lib/krb5/plugins/kdb", NULL }
 #endif
 
 #define DEFAULT_KDC_ENCTYPE     ENCTYPE_AES256_CTS_HMAC_SHA1_96
