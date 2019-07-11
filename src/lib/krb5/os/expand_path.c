@@ -263,6 +263,10 @@ expand_csidl(krb5_context context, PTYPE folder, const char *postfix,
 
 #else /* not _WIN32 */
 #include <pwd.h>
+#include <libgen.h>
+#ifdef HAVE_DLFCN_H
+#include <dlfcn.h>
+#endif /* HAVE_DLFCN_H */
 
 static krb5_error_code
 expand_path(krb5_context context, PTYPE param, const char *postfix, char **ret)
@@ -286,6 +290,63 @@ expand_temp_folder(krb5_context context, PTYPE param, const char *postfix,
         return ENOMEM;
     return 0;
 }
+
+#ifdef HAVE_DLFCN_H
+static krb5_error_code
+expand_prefix(krb5_context context, PTYPE param, const char *postfix,
+              char **ret)
+{
+    char path[PATH_MAX];
+    char *fname, *libdir;
+    Dl_info dl_info = {};
+
+    // Use the directory name of the object file containing
+    // k5_expand_path_tokens (lib/libkrb5.so)
+    dladdr((void*)k5_expand_path_tokens, &dl_info);
+
+    fname = strdup(dl_info.dli_fname);
+    if (fname == NULL)
+        return ENOMEM;
+    // don't free libdir, only free fname
+    libdir = dirname(fname);
+
+    if (postfix == NULL) {
+        strncpy(path, dirname(libdir), PATH_MAX);
+    } else {
+        snprintf(path, PATH_MAX, "%s/%s", dirname(libdir), postfix);
+    }
+    free(fname);
+
+    *ret = strndup(path, PATH_MAX);
+    if (*ret == NULL)
+        return ENOMEM;
+    return 0;
+}
+#else
+static krb5_error_code
+expand_prefix(krb5_context context, PTYPE param, const char *postfix,
+              char **ret)
+{
+    char path[PATH_MAX];
+    char *libdir;
+
+    libdir = strdup(LIBDIR);
+    if (libdir == NULL)
+        return ENOMEM;
+
+    if (postfix == NULL) {
+        strncpy(path, dirname(libdir), PATH_MAX);
+    } else {
+        snprintf(path, PATH_MAX, "%s/%s", dirname(libdir), postfix);
+    }
+    free(libdir);
+
+    *ret = strndup(path, PATH_MAX);
+    if (*ret == NULL)
+        return ENOMEM;
+    return 0;
+}
+#endif
 
 static krb5_error_code
 expand_userid(krb5_context context, PTYPE param, const char *postfix,
@@ -379,9 +440,10 @@ static const struct {
     {"SBINDIR", 0, NULL, expand_bin_dir},
     {"euid", 0, NULL, expand_userid},
 #else
-    {"LIBDIR", 0, LIBDIR, expand_path},
-    {"BINDIR", 0, BINDIR, expand_path},
-    {"SBINDIR", 0, SBINDIR, expand_path},
+    {"PREFIX", 0, NULL, expand_prefix},
+    {"LIBDIR", 0, "lib", expand_prefix},
+    {"BINDIR", 0, "bin", expand_prefix},
+    {"SBINDIR", 0, "sbin", expand_prefix},
     {"euid", 0, NULL, expand_euid},
     {"username", 0, NULL, expand_username},
 #endif

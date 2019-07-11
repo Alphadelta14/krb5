@@ -55,7 +55,7 @@
 #endif
 #endif /* _WINDOWS  */
 
-#define DEFAULT_PLUGIN_BASE_DIR "@LIBDIR/krb5/plugins"
+#define DEFAULT_PLUGIN_BASE_DIR "%{LIBDIR}/krb5/plugins"
 #define PLUGIN_EXT              "@DYNOBJEXT"
 
 #define KDC_DIR                 "@LOCALSTATEDIR/krb5kdc"
