@@ -6,11 +6,15 @@
 
 #include "prof_int.h"
 
+#include <libgen.h>
 #include <stdio.h>
 #include <string.h>
 #ifdef HAVE_STDLIB_H
 #include <stdlib.h>
 #endif
+#ifdef HAVE_DLFCN_H
+#include <dlfcn.h>
+#endif /* HAVE_DLFCN_H */
 #include <errno.h>
 
 /* Create a vtable profile, possibly with a library handle.  The new profile
@@ -54,6 +58,39 @@ init_module(struct profile_vtable *vtable, void *cbdata,
     return 0;
 }
 
+#ifdef HAVE_DLFCN_H
+
+static errcode_t
+join_libdir(char *path, char **ret_path)
+{
+    char *libdir, *fname;
+    Dl_info dl_info = {};
+    errcode_t ret;
+
+    // Use the directory name of the object file containing
+    // profile_init_flags (lib/libkrb5.so)
+    dladdr((void*)profile_init_flags, &dl_info);
+    fname = strdup(dl_info.dli_fname);
+
+    if (fname == NULL)
+        return ENOMEM;
+    // don't free libdir, only free fname after join
+    libdir = dirname(fname);
+    ret = k5_path_join(libdir, path, ret_path);
+    free(fname);
+
+    return ret;
+}
+
+#else /* !HAVE_DLFCN_H */
+
+static errcode_t
+join_libdir(char *path, char **ret_path)
+{
+    return k5_path_join(LIBDIR, path, ret_path);
+}
+#endif /* !HAVE_DLFCN_H */
+
 /* Parse modspec into the module path and residual string. */
 static errcode_t
 parse_modspec(const char *modspec, char **ret_path, char **ret_residual)
@@ -78,7 +115,7 @@ parse_modspec(const char *modspec, char **ret_path, char **ret_residual)
     path[p - modspec] = '\0';
 
     /* Compose the path with LIBDIR if it's not absolute. */
-    ret = k5_path_join(LIBDIR, path, &fullpath);
+    ret = join_libdir(path, &fullpath);
     free(path);
     if (ret)
         return ret;
