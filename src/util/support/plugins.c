@@ -551,6 +551,45 @@ krb5int_get_plugin_filenames (const char * const *filebases, char ***filenames)
     return err;
 }
 
+#ifdef HAVE_DLFCN_H
+#include <dlfcn.h>
+#include <libgen.h>
+
+static long
+get_prefixed_dir(const char *path, char **ret_path)
+{
+    char *libdir, *fname;
+    Dl_info dl_info = {};
+    long ret;
+
+    // Use the directory name of the object file containing
+    // krb5int_open_plugin_dirs (lib/libkrb5.so, etc.)
+    dladdr((void*)krb5int_open_plugin_dirs, &dl_info);
+
+    fname = strdup(dl_info.dli_fname);
+    if (fname == NULL)
+        return ENOMEM;
+    // don't free libdir, only free fname after join
+    libdir = dirname(fname);
+    ret = k5_path_join(dirname(libdir), path, ret_path);
+    free(fname);
+
+    return ret;
+}
+
+#else /* !HAVE_DLFCN_H */
+
+static errcode_t
+join_libdir(const char *path, char **ret_path)
+{
+    char *libdir;
+    libdir = strdup(LIBDIR);
+    ret = k5_path_join(dirname(libdir), path, ret_path);
+    free(libdir);
+    return ret;
+}
+#endif /* !HAVE_DLFCN_H */
+
 
 /* Takes a NULL-terminated list of directories.  If filebases is NULL, filebases is ignored
  * all plugins in the directories are loaded.  If filebases is a NULL-terminated array of names,
@@ -565,8 +604,10 @@ krb5int_open_plugin_dirs (const char * const *dirnames,
     long err = 0;
     struct plugin_file_handle **h = NULL;
     size_t count = 0;
+    char *prefixed_dir;
     char **filenames = NULL;
     int i;
+    DIR *dir;
 
     if (!err) {
         err = krb5int_plugin_file_handle_array_init (&h);
@@ -586,9 +627,13 @@ krb5int_open_plugin_dirs (const char * const *dirnames,
                 char *filepath = NULL;
 
                 if (!err) {
-                    if (asprintf(&filepath, "%s/%s", dirnames[i], filenames[j]) < 0) {
-                        filepath = NULL;
-                        err = ENOMEM;
+                    err = get_prefixed_dir(dirnames[i], &prefixed_dir);
+                    if (!err) {
+                        if (asprintf(&filepath, "%s/%s", dirnames[i], filenames[j]) < 0) {
+                            filepath = NULL;
+                            err = ENOMEM;
+                        }
+                        free(prefixed_dir);
                     }
                 }
 
@@ -598,12 +643,19 @@ krb5int_open_plugin_dirs (const char * const *dirnames,
                         handle = NULL; /* h takes ownership */
                 }
 
-                free(filepath);
+                if (filepath != NULL)
+                    free(filepath);
                 if (handle   != NULL) { krb5int_close_plugin (handle); }
             }
         } else {
-            /* load all plugins in each directory */
-            DIR *dir = opendir (dirnames[i]);
+            err = get_prefixed_dir(dirnames[i], &prefixed_dir);
+            if (!err) {
+                /* load all plugins in each directory */
+                dir = opendir (dirnames[i]);
+                free(prefixed_dir);
+            } else {
+                dir = NULL;
+            }
 
             while (dir != NULL && !err) {
                 struct dirent *d = NULL;
