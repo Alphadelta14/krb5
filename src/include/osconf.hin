@@ -58,7 +58,7 @@
 #ifdef _WIN32
 #define DEFAULT_PLUGIN_BASE_DIR "%{LIBDIR}\\plugins"
 #else
-#define DEFAULT_PLUGIN_BASE_DIR "@LIBDIR/krb5/plugins"
+#define DEFAULT_PLUGIN_BASE_DIR "%{LIBDIR}/krb5/plugins"
 #endif
 
 #if defined(_WIN64)
